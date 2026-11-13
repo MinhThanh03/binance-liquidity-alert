@@ -14,7 +14,8 @@ from typing import Any
 import requests
 
 
-BINANCE_URL = "https://api.binance.com/api/v3/klines"
+BINANCE_EXCHANGE_INFO_URL = "https://fapi.binance.com/fapi/v1/exchangeInfo"
+BINANCE_URL = "https://fapi.binance.com/fapi/v1/klines"
 PUSHOVER_URL = "https://api.pushover.net/1/messages.json"
 INTERVAL = "1h"
 
@@ -180,6 +181,22 @@ def quality_score(
             + (6.0 if midline_ok else 0.0),
         ),
     )
+
+
+def fetch_futures_symbols(session: requests.Session) -> set[str]:
+    response = session.get(BINANCE_EXCHANGE_INFO_URL, timeout=20)
+    response.raise_for_status()
+    payload = response.json()
+    symbols = {
+        item["symbol"]
+        for item in payload.get("symbols", [])
+        if item.get("status") == "TRADING"
+        and item.get("contractType") == "PERPETUAL"
+        and item.get("quoteAsset") == "USDT"
+    }
+    if not symbols:
+        raise RuntimeError("Binance returned no trading USDT perpetual futures")
+    return symbols
 
 
 def fetch_candles(session: requests.Session, symbol: str) -> list[Candle]:
@@ -431,8 +448,10 @@ def send_pushover(session: requests.Session, symbol: str, signal: Signal) -> Non
     response.raise_for_status()
 
 
-def run_once(session: requests.Session, state: dict[str, Any]) -> None:
-    for symbol in SYMBOLS:
+def run_once(
+    session: requests.Session, state: dict[str, Any], symbols: tuple[str, ...]
+) -> None:
+    for symbol in symbols:
         try:
             candles = fetch_candles(session, symbol)
             signal_state, signal = analyze(candles)
@@ -468,11 +487,29 @@ def main() -> None:
     )
     if not SYMBOLS:
         raise SystemExit("SYMBOLS must contain at least one Binance symbol")
-    logging.info("Monitoring %s on closed Binance 1H candles", ", ".join(SYMBOLS))
     session = requests.Session()
+    try:
+        available_symbols = fetch_futures_symbols(session)
+    except requests.RequestException as exc:
+        raise SystemExit(f"Cannot load Binance futures symbols: {exc}") from exc
+
+    active_symbols = tuple(symbol for symbol in SYMBOLS if symbol in available_symbols)
+    unavailable_symbols = tuple(symbol for symbol in SYMBOLS if symbol not in available_symbols)
+    if unavailable_symbols:
+        logging.warning(
+            "Unavailable USDT perpetual futures (skipping): %s",
+            ", ".join(unavailable_symbols),
+        )
+    if not active_symbols:
+        raise SystemExit("None of the configured symbols are available as USDT perpetual futures")
+
+    logging.info(
+        "Monitoring %s on closed Binance USDⓈ-M 1H candles",
+        ", ".join(active_symbols),
+    )
     state = load_state()
     while True:
-        run_once(session, state)
+        run_once(session, state, active_symbols)
         time.sleep(POLL_SECONDS)
 
 

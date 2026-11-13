@@ -1,6 +1,6 @@
 # Binance 1H liquidity alerts
 
-This is a small Debian service that reads **closed 1-hour spot candles** from Binance, applies the useful parts of the supplied TradingView indicator, and sends a Pushover message when `WAITING` changes to `TRADE ACTIVE`.
+This is a small Debian service that reads **closed 1-hour USDⓈ-M perpetual futures candles** from Binance, applies the useful parts of the supplied TradingView indicator, and sends a Pushover message when `WAITING` changes to `TRADE ACTIVE`.
 
 It monitors the symbols in `SYMBOLS`. It does not place orders.
 
@@ -39,6 +39,8 @@ tail -f liquidity-alert.log
 
 The PID is stored in `liquidity-alert.pid`. The process can also be stopped with `Ctrl-C` when running `install_and_run.bash` directly in the foreground.
 
-Create a Pushover application to obtain `PUSHOVER_APP_TOKEN`, then put that token and your Pushover user key in `.env`. Binance public klines do not require API keys.
+Create a Pushover application to obtain `PUSHOVER_APP_TOKEN`, then put that token and your Pushover user key in `.env`. Binance public futures klines do not require API keys.
+
+At startup, the service checks Binance `exchangeInfo` and keeps only configured symbols that are currently `TRADING` USDT perpetual futures. Invalid, delisted, or non-futures symbols are printed as warnings and skipped.
 
 The JSON state file prevents duplicate alerts across polling cycles and restarts. The service treats the final Binance kline as incomplete and never signals on it.
