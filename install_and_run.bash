@@ -34,6 +34,13 @@ if [[ ! -f "${ENV_FILE}" ]]; then
     exit 1
 fi
 
+# Load configuration before starting Python. The file is local and controlled by
+# the operator, and supports normal shell-style KEY=value entries.
+set -a
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+set +a
+
 if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
     echo "Creating local virtual environment..."
     "${PYTHON_BIN}" -m venv "${VENV_DIR}"

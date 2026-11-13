@@ -6,7 +6,7 @@ It monitors the symbols in `SYMBOLS`. It does not place orders.
 
 ## Run directly as root
 
-Place `.env` beside the files. On the first run, the launcher creates `.env` from `.env.example`; edit the Pushover credentials and run it again:
+Place `.env` beside the files. The launcher loads all `.env` settings before starting Python. On the first run, it creates `.env` from `.env.example`; edit the Pushover credentials and run it again:
 
 ```bash
 chmod +x install_and_run.bash
