@@ -39,6 +39,22 @@ if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
     "${PYTHON_BIN}" -m venv "${VENV_DIR}"
 fi
 
+if ! "${VENV_DIR}/bin/python" -m pip --version >/dev/null 2>&1; then
+    echo "The virtual environment has no pip. Installing Debian pip/venv support..."
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        python3-pip \
+        python3-venv
+    echo "Recreating the local virtual environment..."
+    rm -rf "${VENV_DIR}"
+    "${PYTHON_BIN}" -m venv "${VENV_DIR}"
+fi
+
+if ! "${VENV_DIR}/bin/python" -m pip --version >/dev/null 2>&1; then
+    echo "Unable to initialize pip in ${VENV_DIR}." >&2
+    exit 1
+fi
+
 echo "Installing Python requirements..."
 "${VENV_DIR}/bin/python" -m pip install --upgrade pip
 "${VENV_DIR}/bin/python" -m pip install -r "${SCRIPT_DIR}/requirements.txt"
