@@ -19,6 +19,13 @@ Check logs:
 ./install_and_run.bash 2>&1 | tee -a liquidity-alert.log
 ```
 
+Test Pushover without waiting for a trading signal:
+
+```bash
+chmod +x test_notification.bash
+./test_notification.bash
+```
+
 ## Start and stop in the background
 
 After `.env` is configured:
