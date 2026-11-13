@@ -480,6 +480,17 @@ def run_once(
     save_state(state)
 
 
+def available_configured_symbols(
+    session: requests.Session,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    available_symbols = fetch_futures_symbols(session)
+    active_symbols = tuple(symbol for symbol in SYMBOLS if symbol in available_symbols)
+    unavailable_symbols = tuple(
+        symbol for symbol in SYMBOLS if symbol not in available_symbols
+    )
+    return active_symbols, unavailable_symbols
+
+
 def main() -> None:
     logging.basicConfig(
         level=getattr(logging, LOG_LEVEL, logging.INFO),
@@ -488,28 +499,27 @@ def main() -> None:
     if not SYMBOLS:
         raise SystemExit("SYMBOLS must contain at least one Binance symbol")
     session = requests.Session()
-    try:
-        available_symbols = fetch_futures_symbols(session)
-    except requests.RequestException as exc:
-        raise SystemExit(f"Cannot load Binance futures symbols: {exc}") from exc
-
-    active_symbols = tuple(symbol for symbol in SYMBOLS if symbol in available_symbols)
-    unavailable_symbols = tuple(symbol for symbol in SYMBOLS if symbol not in available_symbols)
-    if unavailable_symbols:
-        logging.warning(
-            "Unavailable USDT perpetual futures (skipping): %s",
-            ", ".join(unavailable_symbols),
-        )
-    if not active_symbols:
-        raise SystemExit("None of the configured symbols are available as USDT perpetual futures")
-
-    logging.info(
-        "Monitoring %s on closed Binance USDⓈ-M 1H candles",
-        ", ".join(active_symbols),
-    )
     state = load_state()
     while True:
-        run_once(session, state, active_symbols)
+        try:
+            active_symbols, unavailable_symbols = available_configured_symbols(session)
+            if unavailable_symbols:
+                logging.warning(
+                    "Unavailable USDT perpetual futures this session (skipping): %s",
+                    ", ".join(unavailable_symbols),
+                )
+            if active_symbols:
+                logging.info(
+                    "Monitoring this session: %s",
+                    ", ".join(active_symbols),
+                )
+                run_once(session, state, active_symbols)
+            else:
+                logging.error(
+                    "No configured symbols are available as USDT perpetual futures this session"
+                )
+        except requests.RequestException as exc:
+            logging.error("Cannot load Binance futures symbols this session: %s", exc)
         time.sleep(POLL_SECONDS)
 
 
