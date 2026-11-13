@@ -199,6 +199,19 @@ def fetch_futures_symbols(session: requests.Session) -> set[str]:
     return symbols
 
 
+def futures_symbol_has_klines(session: requests.Session, symbol: str) -> bool:
+    response = session.get(
+        BINANCE_URL,
+        params={"symbol": symbol, "interval": INTERVAL, "limit": 1},
+        timeout=20,
+    )
+    if response.status_code >= 400:
+        return False
+    response.raise_for_status()
+    payload = response.json()
+    return isinstance(payload, list) and bool(payload)
+
+
 def fetch_candles(session: requests.Session, symbol: str) -> list[Candle]:
     response = session.get(
         BINANCE_URL,
@@ -484,11 +497,28 @@ def available_configured_symbols(
     session: requests.Session,
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     available_symbols = fetch_futures_symbols(session)
-    active_symbols = tuple(symbol for symbol in SYMBOLS if symbol in available_symbols)
-    unavailable_symbols = tuple(
+    active_symbols = [
+        symbol for symbol in SYMBOLS if symbol in available_symbols
+    ]
+    metadata_rejected_symbols = [
         symbol for symbol in SYMBOLS if symbol not in available_symbols
+    ]
+    for symbol in metadata_rejected_symbols:
+        try:
+            if futures_symbol_has_klines(session, symbol):
+                active_symbols.append(symbol)
+                logging.info(
+                    "%s accepted from futures klines endpoint",
+                    symbol,
+                )
+        except requests.RequestException:
+            continue
+
+    active_symbol_set = set(active_symbols)
+    unavailable_symbols = tuple(
+        symbol for symbol in SYMBOLS if symbol not in active_symbol_set
     )
-    return active_symbols, unavailable_symbols
+    return tuple(active_symbols), unavailable_symbols
 
 
 def main() -> None:

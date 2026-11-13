@@ -41,6 +41,6 @@ The PID is stored in `liquidity-alert.pid`. The process can also be stopped with
 
 Create a Pushover application to obtain `PUSHOVER_APP_TOKEN`, then put that token and your Pushover user key in `.env`. Binance public futures klines do not require API keys.
 
-Before every polling session, the service checks Binance `exchangeInfo` and keeps only configured symbols that are currently `TRADING` USDT perpetual futures. Invalid, delisted, or non-futures symbols are printed as warnings and skipped for that session; they are checked again during the next session.
+Before every polling session, the service checks Binance `exchangeInfo` and keeps configured symbols that are currently trading USDT futures. For newer TradFi/stock contracts that are not returned in the standard metadata list, it also verifies the symbol directly through the futures klines endpoint. Invalid, delisted, or unsupported symbols are printed as warnings and skipped for that session; they are checked again during the next session.
 
 The JSON state file prevents duplicate alerts across polling cycles and restarts. The service treats the final Binance kline as incomplete and never signals on it.
