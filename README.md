@@ -52,4 +52,4 @@ Before every polling session, the service checks Binance `exchangeInfo` and keep
 
 The JSON state file prevents duplicate alerts across polling cycles and restarts. The service treats the final Binance kline as incomplete and never signals on it.
 
-Pushover alerts are sent only from Monday 07:00 through Friday 12:00 in UTC+7. The service checks Binance's external futures server-time endpoint for this schedule instead of using the local server clock. If that time check fails, the alert is suppressed.
+Pushover alerts are sent only from Monday 07:00 through Saturday 00:00 in UTC+7. The service checks Binance's external futures server-time endpoint for this schedule instead of using the local server clock. If that time check fails, the alert is suppressed.

@@ -457,10 +457,8 @@ def pushover_window_open(now_utc: datetime) -> bool:
     now_local = now_utc.astimezone(UTC_PLUS_7)
     if now_local.weekday() == 0:
         return now_local.time() >= datetime.min.time().replace(hour=7)
-    if 1 <= now_local.weekday() <= 3:
+    if 1 <= now_local.weekday() <= 4:
         return True
-    if now_local.weekday() == 4:
-        return now_local.time() <= datetime.min.time().replace(hour=12)
     return False
 
 
@@ -521,7 +519,7 @@ def run_once(
                         logging.info("%s alert sent: %s", symbol, signal.reason)
                     else:
                         logging.info(
-                            "%s alert suppressed outside the Monday 07:00 to Friday 12:00 UTC+7 window",
+                            "%s alert suppressed outside the Monday 07:00 to Saturday 00:00 UTC+7 window",
                             symbol,
                         )
             symbol_state["signal_state"] = signal_state
