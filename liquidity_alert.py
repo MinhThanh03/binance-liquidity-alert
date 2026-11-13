@@ -8,6 +8,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,8 +17,10 @@ import requests
 
 BINANCE_EXCHANGE_INFO_URL = "https://fapi.binance.com/fapi/v1/exchangeInfo"
 BINANCE_URL = "https://fapi.binance.com/fapi/v1/klines"
+BINANCE_TIME_URL = "https://fapi.binance.com/fapi/v1/time"
 PUSHOVER_URL = "https://api.pushover.net/1/messages.json"
 INTERVAL = "1h"
+UTC_PLUS_7 = timezone(timedelta(hours=7))
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -440,6 +443,27 @@ def save_state(state: dict[str, Any]) -> None:
     temporary.replace(STATE_FILE)
 
 
+def global_time(session: requests.Session) -> datetime:
+    response = session.get(BINANCE_TIME_URL, timeout=10)
+    response.raise_for_status()
+    payload = response.json()
+    server_time = payload.get("serverTime") if isinstance(payload, dict) else None
+    if not isinstance(server_time, int):
+        raise RuntimeError("Binance returned an invalid server time")
+    return datetime.fromtimestamp(server_time / 1000, tz=timezone.utc)
+
+
+def pushover_window_open(now_utc: datetime) -> bool:
+    now_local = now_utc.astimezone(UTC_PLUS_7)
+    if now_local.weekday() == 0:
+        return now_local.time() >= datetime.min.time().replace(hour=7)
+    if 1 <= now_local.weekday() <= 3:
+        return True
+    if now_local.weekday() == 4:
+        return now_local.time() <= datetime.min.time().replace(hour=12)
+    return False
+
+
 def send_pushover(session: requests.Session, symbol: str, signal: Signal) -> None:
     token = os.getenv("PUSHOVER_APP_TOKEN")
     user = os.getenv("PUSHOVER_USER_KEY")
@@ -482,9 +506,24 @@ def run_once(
                 and signal is not None
                 and signal_id != symbol_state.get("last_alert_id")
             ):
-                send_pushover(session, symbol, signal)
-                symbol_state["last_alert_id"] = signal_id
-                logging.info("%s alert sent: %s", symbol, signal.reason)
+                try:
+                    now_utc = global_time(session)
+                except (requests.RequestException, RuntimeError, ValueError) as exc:
+                    logging.warning(
+                        "%s alert suppressed because global time is unavailable: %s",
+                        symbol,
+                        exc,
+                    )
+                else:
+                    if pushover_window_open(now_utc):
+                        send_pushover(session, symbol, signal)
+                        symbol_state["last_alert_id"] = signal_id
+                        logging.info("%s alert sent: %s", symbol, signal.reason)
+                    else:
+                        logging.info(
+                            "%s alert suppressed outside the Monday 07:00 to Friday 12:00 UTC+7 window",
+                            symbol,
+                        )
             symbol_state["signal_state"] = signal_state
             symbol_state["last_candle_time"] = latest_open_time
             logging.info("%s: %s", symbol, signal_state)

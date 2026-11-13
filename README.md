@@ -51,3 +51,5 @@ Create a Pushover application to obtain `PUSHOVER_APP_TOKEN`, then put that toke
 Before every polling session, the service checks Binance `exchangeInfo` and keeps configured symbols that are currently trading USDT futures. For newer TradFi/stock contracts that are not returned in the standard metadata list, it also verifies the symbol directly through the futures klines endpoint. Invalid, delisted, or unsupported symbols are printed as warnings and skipped for that session; they are checked again during the next session.
 
 The JSON state file prevents duplicate alerts across polling cycles and restarts. The service treats the final Binance kline as incomplete and never signals on it.
+
+Pushover alerts are sent only from Monday 07:00 through Friday 12:00 in UTC+7. The service checks Binance's external futures server-time endpoint for this schedule instead of using the local server clock. If that time check fails, the alert is suppressed.
